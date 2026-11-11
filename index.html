@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>StudyTrack v2 - Personal Study Tracker</title>
+  
+  <!-- Tailwind CSS & Chart.js CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#1e40af">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .catch(err => console.warn('Service worker belum aktif:', err));
+      });
+    }
+  </script>
+
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans pb-24">
+
+  <!-- TOP BAR -->
+  <header class="bg-blue-800 text-white p-4 sticky top-0 z-30 shadow-md">
+    <div class="max-w-md mx-auto flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid me-2 fa-book-bookmark text-2xl text-blue-200"></i>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">StudyTrack v2</h1>
+          <p class="text-xs text-blue-200">SMK Learning Tracker</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <span id="currentDateDisplay" class="text-xs bg-blue-700 px-2.5 py-1 rounded-full font-medium">--:--</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER (Max width smartphone view) -->
+  <main class="max-w-md mx-auto p-4 space-y-6">
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="sec-dashboard" class="space-y-4">
+      <!-- Target Harian Banner -->
+      <div class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white rounded-2xl p-5 shadow-lg relative overflow-hidden">
+        <div class="relative z-10">
+          <p class="text-xs text-blue-200 font-semibold uppercase tracking-wider">Semangat Belajar!</p>
+          <h2 class="text-xl font-bold mt-1">Target Hari Ini</h2>
+          <div class="mt-4 flex justify-between items-end">
+            <div>
+              <span id="dashTodayTime" class="text-2xl font-extrabold">0 / 60</span>
+              <span class="text-xs text-blue-200">Menit</span>
+            </div>
+            <span id="dashTargetPercent" class="text-sm font-bold bg-blue-600 px-2 py-0.5 rounded-full">0%</span>
+          </div>
+          <!-- Progress Bar -->
+          <div class="w-full bg-blue-900/60 rounded-full h-2.5 mt-2 overflow-hidden">
+            <div id="dashProgressBar" class="bg-amber-400 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+        <i class="fa-solid fa-graduation-cap absolute -right-4 -bottom-4 text-8xl text-white/10"></i>
+      </div>
+
+      <!-- Quick Action: Mulai Sesi Mandiri -->
+      <button onclick="switchTab('belajar')" class="w-full bg-white border border-blue-100 p-4 rounded-xl shadow-sm flex items-center justify-between hover:bg-blue-50 transition active:scale-95">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-play"></i>
+          </div>
+          <div class="text-left">
+            <h3 class="font-bold text-sm text-gray-800">Mulai Belajar Mandiri</h3>
+            <p class="text-xs text-gray-500">Target minimal 15 menit per mapel</p>
+          </div>
+        </div>
+        <i class="fa-solid fa-chevron-right text-gray-400 text-sm"></i>
+      </button>
+
+      <!-- Metric Cards Grid -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-3">
+          <div class="p-3 bg-blue-50 text-blue-600 rounded-lg">
+            <i class="fa-solid fa-folder-open"></i>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium">Total Materi</p>
+            <p id="dashTotalMateri" class="text-lg font-bold text-gray-800">0</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-3">
+          <div class="p-3 bg-red-50 text-red-600 rounded-lg">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium">Belum Paham</p>
+            <p id="dashBelumPaham" class="text-lg font-bold text-gray-800">0</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-3">
+          <div class="p-3 bg-amber-50 text-amber-600 rounded-lg">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium">Hari Ini</p>
+            <p id="dashDurasiHariIni" class="text-lg font-bold text-gray-800">0m</p>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-3">
+          <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <p class="text-xs text-gray-500 font-medium">Menguasai</p>
+            <p id="dashMenguasai" class="text-lg font-bold text-gray-800">0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Learning Activity -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+        <h3 class="font-bold text-sm text-gray-800 flex items-center justify-between">
+          <span><i class="fa-solid fa-history me-2 text-blue-600"></i>Aktivitas Terakhir</span>
+          <span class="text-xs text-blue-600 cursor-pointer" onclick="switchTab('statistik')">Lihat Semua</span>
+        </h3>
+        <div id="dashRecentActivityList" class="space-y-2 text-xs">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: MANAJEMEN MATERI & KESULITAN -->
+    <section id="sec-materi" class="space-y-4 hidden">
+      <div class="flex justify-between items-center">
+        <h2 class="font-bold text-lg text-gray-800">Materi & Kesulitan</h2>
+        <button onclick="openMateriModal()" class="bg-blue-600 text-white text-xs px-3 py-2 rounded-lg font-semibold flex items-center space-x-1 shadow-sm hover:bg-blue-700">
+          <i class="fa-solid fa-plus"></i>
+          <span>Tambah Materi</span>
+        </button>
+      </div>
+
+      <!-- Filter Mapel & Search -->
+      <div class="flex space-x-2">
+        <input type="text" id="searchMateri" oninput="renderMateriList()" placeholder="Cari materi..." class="w-full bg-white text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500">
+        <select id="filterMapel" onchange="renderMateriList()" class="bg-white text-xs border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:border-blue-500">
+          <option value="">Semua Mapel</option>
+        </select>
+      </div>
+
+      <!-- Daftar Materi Cards -->
+      <div id="materiList" class="space-y-3">
+        <!-- Populated via JS -->
+      </div>
+    </section>
+
+    <!-- TAB 3: BELAJAR MANDIRI (15+ MIN TIMER) -->
+    <section id="sec-belajar" class="space-y-4 hidden">
+      <h2 class="font-bold text-lg text-gray-800">Sistem Belajar Mandiri</h2>
+
+      <!-- Timer Card -->
+      <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm text-center space-y-4">
+        <!-- Target indicator -->
+        <div class="inline-block bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full font-medium">
+          <i class="fa-solid fa-bullseye me-1"></i> Target Minimal: 15 Menit
+        </div>
+
+        <!-- Selector Mapel & Materi -->
+        <div class="space-y-2 text-left">
+          <label class="text-xs font-semibold text-gray-600">Pilih Materi yang Ingin Dipelajari:</label>
+          <select id="timerMateriSelect" class="w-full bg-gray-50 border border-gray-200 text-xs rounded-lg p-2.5 focus:outline-none focus:border-blue-500">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <!-- Stopwatch Display -->
+        <div class="py-4">
+          <span id="timerDisplay" class="font-mono text-5xl font-extrabold text-blue-900 tracking-wider">00:00</span>
+          <p id="timerStatusText" class="text-xs text-gray-400 mt-2">Siap untuk memulai belajar</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-center space-x-3">
+          <button id="btnStartTimer" onclick="startTimer()" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-blue-700 active:scale-95 flex items-center space-x-2">
+            <i class="fa-solid fa-play"></i>
+            <span>Mulai</span>
+          </button>
+          <button id="btnPauseTimer" onclick="pauseTimer()" class="bg-amber-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-amber-600 active:scale-95 flex items-center space-x-2 hidden">
+            <i class="fa-solid fa-pause"></i>
+            <span>Jeda</span>
+          </button>
+          <button id="btnStopTimer" onclick="stopTimer()" class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-emerald-700 active:scale-95 flex items-center space-x-2 hidden">
+            <i class="fa-solid fa-check"></i>
+            <span>Selesai</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Post-Session Modal / Log -->
+      <div id="postSessionForm" class="bg-white border border-gray-100 rounded-xl p-4 shadow-sm space-y-3 hidden">
+        <h3 class="font-bold text-sm text-gray-800 border-b pb-2">Catat Hasil Sesi Belajar</h3>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">Catatan Hasil Belajar:</label>
+          <textarea id="sessionNotes" rows="2" class="w-full bg-gray-50 border text-xs rounded-lg p-2 mt-1 focus:outline-none" placeholder="Apa saja yang sudah dipahami pada sesi ini..."></textarea>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-gray-600">Perbarui Status Pemahaman:</label>
+          <select id="sessionStatusUpdate" class="w-full bg-gray-50 border text-xs rounded-lg p-2 mt-1 focus:outline-none">
+            <option value="1">🔴 1. Belum Paham</option>
+            <option value="2">🟡 2. Mulai Memahami</option>
+            <option value="3">🔵 3. Sudah Paham</option>
+            <option value="4">🟢 4. Menguasai</option>
+          </select>
+        </div>
+        <button onclick="saveStudySession()" class="w-full bg-blue-600 text-white text-xs font-bold py-2.5 rounded-lg shadow-sm hover:bg-blue-700">Simpan Ke Riwayat</button>
+      </div>
+    </section>
+
+    <!-- TAB 4: STATISTIK & KALENDER -->
+    <section id="sec-statistik" class="space-y-4 hidden">
+      <h2 class="font-bold text-lg text-gray-800">Statistik & Perkembangan</h2>
+
+      <!-- Chart Durasi -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-2">
+        <h3 class="text-xs font-bold text-gray-700">Durasi Belajar (Menit)</h3>
+        <canvas id="chartWaktuBelajar" class="w-full max-h-48"></canvas>
+      </div>
+
+      <!-- Chart Level Pemahaman -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-2">
+        <h3 class="text-xs font-bold text-gray-700">Distribusi Pemahaman Materi</h3>
+        <canvas id="chartPemahaman" class="w-full max-h-48"></canvas>
+      </div>
+
+      <!-- Kalender Aktivitas Belajar -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+        <h3 class="text-xs font-bold text-gray-700 flex items-center justify-between">
+          <span>Kalender Activity</span>
+          <span id="calendarMonthYear" class="text-blue-600">November 2026</span>
+        </h3>
+        <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-center text-xs">
+          <!-- Calendar populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: JADWAL & PROFIL/PENGATURAN -->
+    <section id="sec-profil" class="space-y-4 hidden">
+      <!-- Jadwal Sekolah SMK -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+        <div class="flex justify-between items-center">
+          <h3 class="font-bold text-sm text-gray-800"><i class="fa-solid fa-calendar-days me-2 text-blue-600"></i>Jadwal Pelajaran SMK</h3>
+        </div>
+        
+        <!-- Day Selector Tabs -->
+        <div class="flex space-x-1 border-b text-xs pb-1 overflow-x-auto hide-scrollbar">
+          <button onclick="showScheduleDay('senin')" class="day-tab px-3 py-1.5 rounded-t-lg font-semibold bg-blue-600 text-white" id="tab-senin">Senin</button>
+          <button onclick="showScheduleDay('selasa')" class="day-tab px-3 py-1.5 rounded-t-lg font-semibold text-gray-600" id="tab-selasa">Selasa</button>
+          <button onclick="showScheduleDay('rabu')" class="day-tab px-3 py-1.5 rounded-t-lg font-semibold text-gray-600" id="tab-rabu">Rabu</button>
+          <button onclick="showScheduleDay('kamis')" class="day-tab px-3 py-1.5 rounded-t-lg font-semibold text-gray-600" id="tab-kamis">Kamis</button>
+          <button onclick="showScheduleDay('jumat')" class="day-tab px-3 py-1.5 rounded-t-lg font-semibold text-gray-600" id="tab-jumat">Jumat</button>
+        </div>
+
+        <div id="scheduleContainer" class="space-y-2 text-xs pt-1">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+
+      <!-- Backup & Restore Data -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+        <h3 class="font-bold text-sm text-gray-800"><i class="fa-solid fa-database me-2 text-blue-600"></i>Manajemen Data Lokal</h3>
+        <p class="text-xs text-gray-500">Data tersimpan di browser HP ini. Ekspor backup secara berkala agar data aman jika browser dihapus atau berganti perangkat.</p>
+        
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button onclick="exportData()" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-gray-200 flex items-center justify-center space-x-1">
+            <i class="fa-solid fa-download"></i>
+            <span>Ekspor Backup</span>
+          </button>
+          <label class="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-gray-200 flex items-center justify-center space-x-1 cursor-pointer">
+            <i class="fa-solid fa-upload"></i>
+            <span>Impor Backup</span>
+            <input type="file" id="importFile" onchange="importData(event)" class="hidden" accept=".json">
+          </label>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: TAMBAH/EDIT MATERI -->
+  <div id="materiModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-sm text-gray-800" id="materiModalTitle">Tambah Materi Baru</h3>
+        <button onclick="closeMateriModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="materiForm" onsubmit="saveMateri(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="materiId">
+        <div>
+          <label class="font-semibold text-gray-600">Mata Pelajaran</label>
+          <input type="text" id="materiMapel" required class="w-full border rounded-lg p-2 mt-1 focus:outline-blue-500" placeholder="Contoh: Matematika">
+        </div>
+        <div>
+          <label class="font-semibold text-gray-600">Judul Materi</label>
+          <input type="text" id="materiJudul" required class="w-full border rounded-lg p-2 mt-1 focus:outline-blue-500" placeholder="Contoh: Bentuk Akar">
+        </div>
+        <div>
+          <label class="font-semibold text-gray-600">Sumber Materi</label>
+          <select id="materiSumber" class="w-full border rounded-lg p-2 mt-1 focus:outline-blue-500">
+            <option value="Pembahasan Guru">Pembahasan Guru</option>
+            <option value="Buku Teks">Buku Teks</option>
+            <option value="PDF">File PDF</option>
+            <option value="PPT">PowerPoint</option>
+            <option value="Papan Tulis">Foto Papan Tulis</option>
+          </select>
+        </div>
+        <div>
+          <label class="font-semibold text-gray-600">Catatan Tambahan</label>
+          <textarea id="materiCatatan" rows="2" class="w-full border rounded-lg p-2 mt-1 focus:outline-blue-500" placeholder="Catatan singkat..."></textarea>
+        </div>
+
+        <div class="border-t pt-3">
+          <label class="font-semibold text-gray-700 block mb-1">Sub-Topik Kesulitan (Belum Dipahami):</label>
+          <div id="kesulitanInputs" class="space-y-2">
+            <!-- Dynamic input rows -->
+          </div>
+          <button type="button" onclick="addKesulitanInput()" class="mt-2 text-blue-600 font-semibold hover:underline flex items-center space-x-1">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Tambah Kesulitan</span>
+          </button>
+        </div>
+
+        <div class="flex space-x-2 pt-2">
+          <button type="button" onclick="closeMateriModal()" class="w-1/2 border text-gray-600 py-2 rounded-lg font-semibold">Batal</button>
+          <button type="submit" class="w-1/2 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700">Simpan Materi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAVIGATION (ANDROID STYLE) -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+    <div class="max-w-md mx-auto flex justify-around py-2">
+      <button onclick="switchTab('dashboard')" class="nav-btn text-blue-600 flex flex-col items-center space-y-1" id="nav-dashboard">
+        <i class="fa-solid fa-house text-lg"></i>
+        <span class="text-[10px] font-medium">Beranda</span>
+      </button>
+      <button onclick="switchTab('materi')" class="nav-btn text-gray-400 flex flex-col items-center space-y-1" id="nav-materi">
+        <i class="fa-solid fa-book text-lg"></i>
+        <span class="text-[10px] font-medium">Materi</span>
+      </button>
+      <button onclick="switchTab('belajar')" class="nav-btn text-gray-400 flex flex-col items-center space-y-1" id="nav-belajar">
+        <i class="fa-solid fa-stopwatch text-lg"></i>
+        <span class="text-[10px] font-medium">Belajar</span>
+      </button>
+      <button onclick="switchTab('statistik')" class="nav-btn text-gray-400 flex flex-col items-center space-y-1" id="nav-statistik">
+        <i class="fa-solid fa-chart-line text-lg"></i>
+        <span class="text-[10px] font-medium">Statistik</span>
+      </button>
+      <button onclick="switchTab('profil')" class="nav-btn text-gray-400 flex flex-col items-center space-y-1" id="nav-profil">
+        <i class="fa-solid fa-calendar-day text-lg"></i>
+        <span class="text-[10px] font-medium">Jadwal</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- APP JAVASCRIPT LOGIC -->
+  <script>
+    // JADWAL SESUAI FOTO JADWAL PELAJARAN
+    const DEFAULT_SCHEDULE = {
+      senin: [
+        { jam: "07.00 - 11.30", mapel: "KJD", guru: "Nanda Surisman", ruang: "E.307" },
+        { jam: "11.30 - 12.30", mapel: "ISOMA", guru: "-", ruang: "-" },
+        { jam: "12.30 - 15.30", mapel: "PDG", guru: "Erna Agustina", ruang: "E.304" }
+      ],
+      selasa: [
+        { jam: "07.00 - 08.30", mapel: "SEJ", guru: "Lailatul Sa'diyah", ruang: "C.214" },
+        { jam: "08.30 - 10.00", mapel: "MAT", guru: "Anita Diah F.", ruang: "D.204" },
+        { jam: "10.00 - 11.30", mapel: "IPAS", guru: "Dini Ari R.", ruang: "B.204" },
+        { jam: "11.30 - 12.30", mapel: "ISOMA", guru: "-", ruang: "-" },
+        { jam: "12.30 - 14.00", mapel: "Informatika", guru: "David Yulia G.", ruang: "A.203/B.203" },
+        { jam: "14.00 - 15.30", mapel: "B. Inggris", guru: "Kristiana Puji L.", ruang: "D.104" }
+      ],
+      rabu: [
+        { jam: "07.00 - 08.30", mapel: "IPAS", guru: "Dini Ari R.", ruang: "B.204" },
+        { jam: "08.30 - 10.00", mapel: "B. Indonesia", guru: "Ario Setyodamar", ruang: "A.109" },
+        { jam: "10.00 - 11.30", mapel: "Olahraga", guru: "-", ruang: "Lapangan" },
+        { jam: "11.30 - 12.30", mapel: "ISOMA", guru: "-", ruang: "-" },
+        { jam: "12.30 - 14.00", mapel: "PABP", guru: "Moch. Marno", ruang: "B.103" },
+        { jam: "14.00 - 15.30", mapel: "B. Jawa", guru: "Erna Agustina", ruang: "C.115" }
+      ],
+      kamis: [
+        { jam: "07.45 - 08.30", mapel: "BK", guru: "Mam Ayunda", ruang: "C.112" },
+        { jam: "08.30 - 10.00", mapel: "Seni Musik", guru: "Peter Pandu S.P", ruang: "C.114" },
+        { jam: "10.00 - 11.30", mapel: "B. Inggris", guru: "Kristiana Puji L.", ruang: "D.104" },
+        { jam: "11.30 - 12.30", mapel: "ISOMA", guru: "-", ruang: "-" },
+        { jam: "12.30 - 14.00", mapel: "B. Indonesia", guru: "Ario Setyodamar", ruang: "A.109" },
+        { jam: "14.00 - 15.30", mapel: "IPAS", guru: "Dini Ari R.", ruang: "B.204" }
+      ],
+      jumat: [
+        { jam: "07.00 - 08.30", mapel: "PP", guru: "Luhur Koprianto", ruang: "B.105" },
+        { jam: "08.30 - 10.00", mapel: "MAT", guru: "Anita Diah", ruang: "D.204" },
+        { jam: "11.30 - 12.30", mapel: "ISOMA", guru: "-", ruang: "-" },
+        { jam: "14.45 - 17.30", mapel: "EKSTRA", guru: "-", ruang: "Sesuai kegiatan" }
+      ]
+    };
+
+    function localDateKey(date = new Date()) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    // APP STATE
+    let db = {
+      materi: JSON.parse(localStorage.getItem('st_materi')) || [],
+      sessions: JSON.parse(localStorage.getItem('st_sessions')) || [],
+      targetDailyMinutes: 60
+    };
+
+    // TIMER STATE
+    let timerInterval = null;
+    let timerSeconds = 0;
+    let isTimerRunning = false;
+
+    // INITIALIZATION
+    window.onload = function() {
+      updateDateDisplay();
+      if (db.materi.length === 0) seedInitialData();
+      renderDashboard();
+      renderMateriList();
+      populateTimerMateriSelect();
+      showScheduleDay('senin');
+      initCharts();
+      renderCalendar();
+    };
+
+    function saveData() {
+      localStorage.setItem('st_materi', JSON.stringify(db.materi));
+      localStorage.setItem('st_sessions', JSON.stringify(db.sessions));
+    }
+
+    function seedInitialData() {
+      db.materi = [
+        {
+          id: 'mat-1',
+          mapel: 'Matematika',
+          judul: 'Bentuk Akar',
+          sumber: 'Pembahasan Guru',
+          catatan: 'Halaman 42 buku cetak',
+          tanggal: '2026-11-01',
+          kesulitan: [
+            { id: 'k1', teks: 'Menyederhanakan bentuk akar', status: 1 },
+            { id: 'k2', teks: 'Menentukan faktor kuadrat sempurna', status: 2 },
+            { id: 'k3', teks: 'Operasi penjumlahan bentuk akar', status: 1 }
+          ]
+        }
+      ];
+      saveData();
+    }
+
+    function updateDateDisplay() {
+      const now = new Date();
+      const options = { weekday: 'short', day: 'numeric', month: 'short' };
+      document.getElementById('currentDateDisplay').textContent = now.toLocaleDateString('id-ID', options);
+    }
+
+    // TAB NAVIGATION
+    function switchTab(tabId) {
+      document.querySelectorAll('main > section').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`sec-${tabId}`).classList.remove('hidden');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('text-blue-600');
+        btn.classList.add('text-gray-400');
+      });
+      document.getElementById(`nav-${tabId}`).classList.remove('text-gray-400');
+      document.getElementById(`nav-${tabId}`).classList.add('text-blue-600');
+
+      if (tabId === 'dashboard') renderDashboard();
+      if (tabId === 'statistik') updateCharts();
+    }
+
+    // DASHBOARD RENDER
+    function renderDashboard() {
+      const totalMateri = db.materi.length;
+      let totalBelumPaham = 0;
+      let totalMenguasai = 0;
+
+      db.materi.forEach(m => {
+        m.kesulitan.forEach(k => {
+          if (parseInt(k.status) === 1) totalBelumPaham++;
+          if (parseInt(k.status) === 4) totalMenguasai++;
+        });
+      });
+
+      const todayStr = localDateKey();
+      const todaySessions = db.sessions.filter(s => s.tanggal.startsWith(todayStr));
+      const todayMinutes = todaySessions.reduce((acc, curr) => acc + curr.durasi, 0);
+
+      document.getElementById('dashTotalMateri').textContent = totalMateri;
+      document.getElementById('dashBelumPaham').textContent = totalBelumPaham;
+      document.getElementById('dashDurasiHariIni').textContent = `${todayMinutes}m`;
+      document.getElementById('dashMenguasai').textContent = totalMenguasai;
+
+      document.getElementById('dashTodayTime').textContent = `${todayMinutes} / ${db.targetDailyMinutes}`;
+      const percent = Math.min(100, Math.round((todayMinutes / db.targetDailyMinutes) * 100));
+      document.getElementById('dashTargetPercent').textContent = `${percent}%`;
+      document.getElementById('dashProgressBar').style.width = `${percent}%`;
+
+      // Recent Activity List
+      const recentContainer = document.getElementById('dashRecentActivityList');
+      recentContainer.innerHTML = '';
+      const sortedSessions = [...db.sessions].reverse().slice(0, 3);
+      
+      if (sortedSessions.length === 0) {
+        recentContainer.innerHTML = `<p class="text-gray-400 py-2">Belum ada aktivitas belajar recorded.</p>`;
+      } else {
+        sortedSessions.forEach(s => {
+          recentContainer.innerHTML += `
+            <div class="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+              <div>
+                <span class="font-bold text-gray-700">${s.mapel}</span> - <span class="text-gray-500">${s.judul}</span>
+                <p class="text-[10px] text-gray-400">${s.tanggal} (${s.durasi} menit)</p>
+              </div>
+              <span class="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full font-bold">+${s.durasi}m</span>
+            </div>
+          `;
+        });
+      }
+    }
+
+    // MANAJEMEN MATERI
+    function renderMateriList() {
+      const container = document.getElementById('materiList');
+      const search = document.getElementById('searchMateri').value.toLowerCase();
+      const filter = document.getElementById('filterMapel').value;
+      container.innerHTML = '';
+
+      const filtered = db.materi.filter(m => {
+        const matchSearch = m.judul.toLowerCase().includes(search) || m.mapel.toLowerCase().includes(search);
+        const matchFilter = filter ? m.mapel === filter : true;
+        return matchSearch && matchFilter;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-center text-xs text-gray-400 py-6">Belum ada data materi.</p>`;
+        return;
+      }
+
+      filtered.forEach(m => {
+        let meSubItems = '';
+        m.kesulitan.forEach(k => {
+          const badgeClass = getStatusBadgeClass(k.status);
+          const statusLabel = getStatusLabel(k.status);
+          meSubItems += `
+            <div class="flex justify-between items-center bg-gray-50 p-2 rounded border border-gray-100 text-xs">
+              <span class="text-gray-700 font-medium">${k.teks}</span>
+              <span class="${badgeClass} px-2 py-0.5 rounded-full text-[10px] font-bold">${statusLabel}</span>
+            </div>
+          `;
+        });
+
+        container.innerHTML += `
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-3">
+            <div class="flex justify-between items-start">
+              <div>
+                <span class="bg-blue-50 text-blue-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase">${m.mapel}</span>
+                <h3 class="font-bold text-sm text-gray-800 mt-1">${m.judul}</h3>
+                <p class="text-[11px] text-gray-400">Sumber: ${m.sumber}</p>
+              </div>
+              <div class="flex space-x-2">
+                <button onclick="editMateri('${m.id}')" class="text-gray-400 hover:text-blue-600"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
+                <button onclick="deleteMateri('${m.id}')" class="text-gray-400 hover:text-red-600"><i class="fa-solid fa-trash text-xs"></i></button>
+              </div>
+            </div>
+            ${m.catatan ? `<p class="text-xs text-gray-600 bg-gray-50 p-2 rounded italic">"${m.catatan}"</p>` : ''}
+            <div class="space-y-1 pt-1">
+              <p class="text-[11px] font-semibold text-gray-500">Bagian Belum Dipahami:</p>
+              ${meSubItems || '<p class="text-[11px] text-gray-400">Semua materi dipahami dengan baik.</p>'}
+            </div>
+          </div>
+        `;
+      });
+
+      updateMapelDropdown();
+    }
+
+    function getStatusBadgeClass(status) {
+      switch(parseInt(status)) {
+        case 1: return 'bg-red-100 text-red-700';
+        case 2: return 'bg-amber-100 text-amber-700';
+        case 3: return 'bg-blue-100 text-blue-700';
+        case 4: return 'bg-emerald-100 text-emerald-700';
+        default: return 'bg-gray-100 text-gray-700';
+      }
+    }
+
+    function getStatusLabel(status) {
+      switch(parseInt(status)) {
+        case 1: return 'Belum Paham';
+        case 2: return 'Mulai Memahami';
+        case 3: return 'Sudah Paham';
+        case 4: return 'Menguasai';
+        default: return '-';
+      }
+    }
+
+    function updateMapelDropdown() {
+      const select = document.getElementById('filterMapel');
+      const current = select.value;
+      const mapels = [...new Set(db.materi.map(m => m.mapel))];
+      select.innerHTML = `<option value="">Semua Mapel</option>`;
+      mapels.forEach(mapel => {
+        select.innerHTML += `<option value="${mapel}" ${mapel === current ? 'selected' : ''}>${mapel}</option>`;
+      });
+    }
+
+    // MATERI MODAL LOGIC
+    function openMateriModal(editId = null) {
+      const modal = document.getElementById('materiModal');
+      const form = document.getElementById('materiForm');
+      const inputsContainer = document.getElementById('kesulitanInputs');
+      inputsContainer.innerHTML = '';
+      form.reset();
+
+      if (editId) {
+        const item = db.materi.find(m => m.id === editId);
+        document.getElementById('materiId').value = item.id;
+        document.getElementById('materiMapel').value = item.mapel;
+        document.getElementById('materiJudul').value = item.judul;
+        document.getElementById('materiSumber').value = item.sumber;
+        document.getElementById('materiCatatan').value = item.catatan;
+        
+        item.kesulitan.forEach(k => addKesulitanInput(k.teks, k.status));
+      } else {
+        document.getElementById('materiId').value = '';
+        addKesulitanInput();
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeMateriModal() {
+      document.getElementById('materiModal').classList.add('hidden');
+    }
+
+    function addKesulitanInput(teks = '', status = 1) {
+      const container = document.getElementById('kesulitanInputs');
+      const rowId = 'k_row_' + Date.now() + Math.random();
+      const div = document.createElement('div');
+      div.className = 'flex space-x-1 items-center';
+      div.id = rowId;
+      div.innerHTML = `
+        <input type="text" value="${teks}" placeholder="Contoh: Operasi penjumlahan" class="kesulitan-text w-full border rounded p-1.5 focus:outline-none" required>
+        <select class="kesulitan-status border rounded p-1.5 focus:outline-none">
+          <option value="1" ${status == 1 ? 'selected' : ''}>🔴 1</option>
+          <option value="2" ${status == 2 ? 'selected' : ''}>🟡 2</option>
+          <option value="3" ${status == 3 ? 'selected' : ''}>🔵 3</option>
+          <option value="4" ${status == 4 ? 'selected' : ''}>🟢 4</option>
+        </select>
+        <button type="button" onclick="document.getElementById('${rowId}').remove()" class="text-red-500 p-1"><i class="fa-solid fa-xmark"></i></button>
+      `;
+      container.appendChild(div);
+    }
+
+    function saveMateri(e) {
+      e.preventDefault();
+      const id = document.getElementById('materiId').value || 'mat-' + Date.now();
+      const mapel = document.getElementById('materiMapel').value;
+      const judul = document.getElementById('materiJudul').value;
+      const sumber = document.getElementById('materiSumber').value;
+      const catatan = document.getElementById('materiCatatan').value;
+
+      const kesElements = document.querySelectorAll('#kesulitanInputs > div');
+      const kesulitan = [];
+      kesElements.forEach((el, index) => {
+        const teks = el.querySelector('.kesulitan-text').value;
+        const status = parseInt(el.querySelector('.kesulitan-status').value);
+        if (teks.trim()) {
+          kesulitan.push({ id: 'k-' + index, teks, status });
+        }
+      });
+
+      const existingIndex = db.materi.findIndex(m => m.id === id);
+      const newMateri = {
+        id, mapel, judul, sumber, catatan,
+        tanggal: new Date().toISOString().split('T')[0],
+        kesulitan
+      };
+
+      if (existingIndex >= 0) {
+        db.materi[existingIndex] = newMateri;
+      } else {
+        db.materi.push(newMateri);
+      }
+
+      saveData();
+      closeMateriModal();
+      renderMateriList();
+      populateTimerMateriSelect();
+    }
+
+    function deleteMateri(id) {
+      if (confirm('Hapus materi ini?')) {
+        db.materi = db.materi.filter(m => m.id !== id);
+        saveData();
+        renderMateriList();
+        populateTimerMateriSelect();
+      }
+    }
+
+    function editMateri(id) {
+      openMateriModal(id);
+    }
+
+    // STUDY TIMER
+    function populateTimerMateriSelect() {
+      const select = document.getElementById('timerMateriSelect');
+      select.innerHTML = '';
+      if (db.materi.length === 0) {
+        select.innerHTML = `<option value="">Belum ada materi terdaftar</option>`;
+        return;
+      }
+      db.materi.forEach(m => {
+        select.innerHTML += `<option value="${m.id}">[${m.mapel}] ${m.judul}</option>`;
+      });
+    }
+
+    function startTimer() {
+      if (db.materi.length === 0) {
+        alert('Tambahkan materi terlebih dahulu di menu Materi!');
+        return;
+      }
+      isTimerRunning = true;
+      document.getElementById('btnStartTimer').classList.add('hidden');
+      document.getElementById('btnPauseTimer').classList.remove('hidden');
+      document.getElementById('btnStopTimer').classList.remove('hidden');
+      document.getElementById('timerStatusText').textContent = 'Sesi belajar sedang berlangsung...';
+
+      timerInterval = setInterval(() => {
+        timerSeconds++;
+        updateTimerDisplay();
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      isTimerRunning = false;
+      clearInterval(timerInterval);
+      document.getElementById('btnStartTimer').classList.remove('hidden');
+      document.getElementById('btnPauseTimer').classList.add('hidden');
+      document.getElementById('timerStatusText').textContent = 'Sesi belajar dijeda.';
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      isTimerRunning = false;
+      const minutesSpent = Math.max(1, Math.round(timerSeconds / 60));
+
+      if (minutesSpent < 15) {
+        if (!confirm(`Durasi belajar baru ${minutesSpent} menit. Target minimal adalah 15 menit. Yakin ingin mengakhiri sesi?`)) {
+          return;
+        }
+      }
+
+      document.getElementById('postSessionForm').classList.remove('hidden');
+      document.getElementById('btnStartTimer').classList.remove('hidden');
+      document.getElementById('btnPauseTimer').classList.add('hidden');
+      document.getElementById('btnStopTimer').classList.add('hidden');
+    }
+
+    function updateTimerDisplay() {
+      const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+      const s = (timerSeconds % 60).toString().padStart(2, '0');
+      document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+    }
+
+    function saveStudySession() {
+      const materiId = document.getElementById('timerMateriSelect').value;
+      const materiObj = db.materi.find(m => m.id === materiId);
+      const notes = document.getElementById('sessionNotes').value;
+      const newStatus = parseInt(document.getElementById('sessionStatusUpdate').value);
+      const minutesSpent = Math.max(1, Math.round(timerSeconds / 60));
+
+      const newSession = {
+        id: 'ses-' + Date.now(),
+        materiId,
+        mapel: materiObj ? materiObj.mapel : '-',
+        judul: materiObj ? materiObj.judul : '-',
+        durasi: minutesSpent,
+        catatan: notes,
+        tanggal: `${localDateKey()} ${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
+      };
+
+      db.sessions.push(newSession);
+
+      // Optionally update status of difficulties in this materi
+      if (materiObj && materiObj.kesulitan.length > 0) {
+        materiObj.kesulitan.forEach(k => k.status = newStatus);
+      }
+
+      saveData();
+
+      // Reset timer
+      timerSeconds = 0;
+      updateTimerDisplay();
+      document.getElementById('postSessionForm').classList.add('hidden');
+      document.getElementById('sessionNotes').value = '';
+      document.getElementById('timerStatusText').textContent = 'Sesi belajar berhasil disimpan!';
+
+      alert('Sesi belajar berhasil dicatat!');
+      renderDashboard();
+      updateCharts();
+      renderCalendar();
+    }
+
+    // JADWAL PELAJARAN
+    function showScheduleDay(day) {
+      document.querySelectorAll('.day-tab').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white');
+        btn.classList.add('text-gray-600');
+      });
+      document.getElementById(`tab-${day}`).classList.add('bg-blue-600', 'text-white');
+      document.getElementById(`tab-${day}`).classList.remove('text-gray-600');
+
+      const container = document.getElementById('scheduleContainer');
+      container.innerHTML = '';
+      const list = DEFAULT_SCHEDULE[day] || [];
+
+      list.forEach(item => {
+        container.innerHTML += `
+          <div class="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg border border-gray-100">
+            <div>
+              <span class="font-bold text-gray-800">${item.mapel}</span>
+              <p class="text-[11px] text-gray-500">Guru: ${item.guru}</p>
+            </div>
+            <div class="text-right">
+              <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded">${item.jam}</span>
+              <p class="text-[10px] text-gray-400 mt-0.5">Ruang: ${item.ruang}</p>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // STATISTIK & CHARTS
+    let barChartInstance = null;
+    let pieChartInstance = null;
+
+    function initCharts() {
+      const ctx1 = document.getElementById('chartWaktuBelajar').getContext('2d');
+      barChartInstance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Ming'],
+          datasets: [{
+            label: 'Menit Belajar',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: '#3b82f6',
+            borderRadius: 6
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const ctx2 = document.getElementById('chartPemahaman').getContext('2d');
+      pieChartInstance = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: ['Belum Paham', 'Mulai Memahami', 'Sudah Paham', 'Menguasai'],
+          datasets: [{
+            data: [0, 0, 0, 0],
+            backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981']
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      updateCharts();
+    }
+
+    function updateCharts() {
+      if (!barChartInstance || !pieChartInstance) return;
+
+      // Durasi belajar per hari pada minggu berjalan.
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      const totals = Array(7).fill(0);
+      db.sessions.forEach(session => {
+        const datePart = (session.tanggal || '').slice(0, 10);
+        const idx = Math.round((new Date(datePart + 'T00:00:00') - monday) / 86400000);
+        if (idx >= 0 && idx < 7) totals[idx] += Number(session.durasi) || 0;
+      });
+      barChartInstance.data.labels = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+      barChartInstance.data.datasets[0].data = totals;
+      barChartInstance.update();
+
+      // Distribusi tingkat pemahaman materi.
+      let count1 = 0, count2 = 0, count3 = 0, count4 = 0;
+      db.materi.forEach(m => (m.kesulitan || []).forEach(k => {
+        const st = parseInt(k.status);
+        if (st === 1) count1++;
+        if (st === 2) count2++;
+        if (st === 3) count3++;
+        if (st === 4) count4++;
+      }));
+      pieChartInstance.data.datasets[0].data = [count1, count2, count3, count4];
+      pieChartInstance.update();
+    }
+
+    // KALENDER AKTIVITAS BERDASARKAN SESI BELAJAR TERSIMPAN
+    function renderCalendar() {
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      document.getElementById('calendarMonthYear').textContent =
+        now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+      ['Mg', 'Sn', 'Sl', 'Rb', 'Km', 'Jm', 'Sb'].forEach(day => {
+        grid.innerHTML += `<div class="font-bold text-gray-400 py-1">${day}</div>`;
+      });
+      const activeDates = new Set((db.sessions || []).map(s => (s.tanggal || '').slice(0, 10)));
+      for (let i = 0; i < firstDay; i++) grid.innerHTML += '<div></div>';
+      for (let day = 1; day <= daysInMonth; day++) {
+        const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const active = activeDates.has(key);
+        const todayClass = day === now.getDate() ? ' ring-2 ring-blue-500' : '';
+        const classes = active ? 'bg-blue-100 text-blue-700 font-bold' : 'bg-gray-50 text-gray-600';
+        grid.innerHTML += `<div class="${classes}${todayClass} p-2 rounded-lg text-center">${day}${active ? '<span class="block text-[8px]">●</span>' : ''}</div>`;
+      }
+    }
+
+    // BACKUP & RESTORE
+    function exportData() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `studytrack_backup_${localDateKey()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          if (importedData.materi && importedData.sessions) {
+            db = importedData;
+            saveData();
+            alert('Data berhasil diimpor!');
+            location.reload();
+          } else {
+            alert('Format file backup tidak valid.');
+          }
+        } catch (err) {
+          alert('Gagal membaca file JSON.');
+        }
+      };
+      reader.readAsText(file);
+    }
+  </script>
+</body>
+</html>
